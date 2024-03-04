@@ -1,5 +1,5 @@
 from tkinter import Tk, BOTH, Canvas
-import time
+import time,random
 
 class Window:
 
@@ -71,10 +71,10 @@ class Line:
         return f"Line(start={self.start}, end={self.end})"
 
 class Cell:
-    def __init__(self, start, end, window=None, up=False, down=False, left=False, right=False, win=None):
+    def __init__(self, start, end, window=None, up=False, down=False, left=False, right=False, win=None, visited = False):
         if not isinstance(start, Point) or not isinstance(end, Point):
             raise TypeError("Constructor only takes Point objects as parameters.")
-        if not isinstance(window, Window):
+        if not isinstance(window, Window) and window is not None:
             raise TypeError("window param takes Window object")
         if not isinstance(win, bool) and win is not None:
             raise TypeError("win param takes boolean")
@@ -86,6 +86,46 @@ class Cell:
         self.down = down
         self.left = left
         self.right = right
+        self.visited = visited
+
+    def set_up(self, up):
+        if not isinstance(up, bool):
+            raise TypeError("set_up(self, up): 'up' must be of type bool")
+        self.up = up
+
+    def get_up(self):
+        return self.up
+
+    # Similar methods for 'down', 'left', and 'right' attributes
+    def set_down(self, down):
+        if not isinstance(down, bool):
+            raise TypeError("set_down(self, down): 'down' must be of type bool")
+        self.down = down
+
+    def get_down(self):
+        return self.down
+
+    def set_left(self, left):
+        if not isinstance(left, bool):
+            raise TypeError("set_left(self, left): 'left' must be of type bool")
+        self.left = left
+
+    def get_left(self):
+        return self.left
+
+    def set_right(self, right):
+        if not isinstance(right, bool):
+            raise TypeError("set_right(self, right): 'right' must be of type bool")
+        self.right = right
+
+    def get_right(self):
+        return self.right
+    
+    def set_visited(self,visited):
+        self.visited = visited
+    
+    def get_visited(self):
+        return self.visited
 
     def draw(self):
         if not isinstance(self.start, Point) or not isinstance(self.end, Point):
@@ -94,12 +134,24 @@ class Cell:
         # Draw cell boundaries based on wall attributes
         if self.up:
             self.window.draw_line(Line(self.start, Point(self.end.x, self.start.y)))
+        else:
+            self.window.draw_line(Line(self.start, Point(self.end.x, self.start.y)), fill_color="white")
+
         if self.down:
             self.window.draw_line(Line(Point(self.start.x, self.end.y), self.end))
+        else:
+            self.window.draw_line(Line(Point(self.start.x, self.end.y), self.end), fill_color="white")
+
         if self.left:
             self.window.draw_line(Line(self.start, Point(self.start.x, self.end.y)))
+        else:
+            self.window.draw_line(Line(self.start, Point(self.start.x, self.end.y)), fill_color="white")
+
         if self.right:
             self.window.draw_line(Line(Point(self.end.x, self.start.y), self.end))
+        else:
+            self.window.draw_line(Line(Point(self.end.x, self.start.y), self.end), fill_color="white")
+
 
     def draw_move(self, to_cell, undo=False):
         if not isinstance(to_cell,Cell):
@@ -120,6 +172,7 @@ class Maze:
         cell_size_x,
         cell_size_y,
         window=None,
+        seed=None
     ):
         self.start = start
         self.num_rows = num_rows
@@ -127,6 +180,7 @@ class Maze:
         self.cell_size_x = cell_size_x
         self.cell_size_y = cell_size_y
         self.window = window
+        self.seed = random.seed(seed) if seed != None else 0
         self._create_cells()
 
     def _create_cells(self):
@@ -140,23 +194,102 @@ class Maze:
                 x1 = x0 + self.cell_size_x
                 y1 = y0 + self.cell_size_y
                 # Create a cell object and store it in the cells list
-                row_cells.append(Cell(Point(x0, y0), Point(x1, y1), self.window))
+                row_cells.append(Cell(Point(x0, y0), Point(x1, y1),  window=self.window, up=True, down=True, left=True, right=True))
             self.cells.append(row_cells)
 
     def _draw_cell(self, i, j):
         if 0 <= i < self.num_rows and 0 <= j < self.num_cols:
             self.cells[i][j].draw()
 
+    
+
+    def _draw_maze(self):
+            for i in range(self.num_rows):
+                for j in range(self.num_cols):
+                    self._draw_cell(i, j)
+
+    def _break_entrance_and_exit(self):
+
+        entrance = self.cells[0][0]
+        exit = self.cells[self.num_rows-1][self.num_cols-1]
+        entrance.set_left(False)
+        self._draw_cell(0,0)
+        exit.set_right(False)
+        self._draw_cell(self.num_rows,self.num_cols)
+
     def _animate(self):
         self.window.redraw()
         time.sleep(0.05)
+
+    def get_adjacent_not_visited(self, i, j):
+        adj_cell = {'up': None, 'down': None, 'right': None, 'left': None}
+
+        if 0 <= i - 1 < self.num_rows and not self.cells[i-1][j].get_visited():
+            adj_cell['up'] = self.cells[i - 1][j]  # Up
+        if 0 <= i + 1 < self.num_rows and not self.cells[i+1][j].get_visited():
+            adj_cell['down'] = self.cells[i + 1][j]  # Down
+        if 0 <= j - 1 < self.num_cols and not self.cells[i][j-1].get_visited():
+            adj_cell['left'] = self.cells[i][j - 1]  # Left
+        if 0 <= j + 1 < self.num_cols and not self.cells[i][j+1].get_visited():
+            adj_cell['right'] = self.cells[i][j + 1]  # Right
+
+        return adj_cell
+
+
+
+    def break_walls_r(self, i, j, current=None):
+        if not current:
+            current = self.cells[i][j]
+        current.set_visited(True)
+        while True:
+            poss_dir = self.get_adjacent_not_visited(i, j)
+            if all(value is None for value in poss_dir.values()):
+                return  # All directions visited, exit the loop
+            unvisited_dirs = {key: value for key, value in poss_dir.items() if value is not None}
+            dir, next = random.choice(list(unvisited_dirs.items()))
+            match dir:
+                case 'up':
+                    current.set_up(False)
+                    next.set_down(False)
+                    self.break_walls_r(i-1,j,next)
+                case 'down':
+                    current.set_down(False)
+                    next.set_up(False)
+                    self.break_walls_r(i+1,j,next)
+                case 'right':
+                    current.set_right(False)
+                    next.set_left(False)
+                    self.break_walls_r(i,j+1,next)
+                case 'left':
+                    current.set_left(False)
+                    next.set_right(False)
+                    self.break_walls_r(i,j-1,next)
+            self._draw_maze()
+            
+    def reset_cells_visited(self):
+        for i in range(self.num_rows):
+                for j in range(self.num_cols):
+                    self.cells[i][j].set_visited(False)
+    
+    def solve(self):
+        return self._solve_r(0,0)
+    
+    def _solve_r(self):
+        self._animate()
+        
+        
 
 
 def main():
     window = Window(1000, 800)
     start = Point(20, 20)
-    maze = Maze(start, 1, 1, 20, 20, window)
-    maze._draw_cell(2, 3)  # Example cell at row 2, column 3
+    maze = Maze(start, 4, 4, 20, 20, window)
+    # for i in range(4):
+    #     for j in range(4):
+    #         maze._draw_cell(i, j)
+    
+    maze.break_walls_r(0,0)
+    maze._draw_maze()
     maze._animate()
     window.wait_for_close()
 
