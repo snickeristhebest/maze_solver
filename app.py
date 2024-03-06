@@ -126,6 +126,12 @@ class Cell:
     
     def get_visited(self):
         return self.visited
+    
+    def set_win(self,win):
+        self.win = win
+    
+    def get_win(self):
+        return self.win
 
     def draw(self):
         if not isinstance(self.start, Point) or not isinstance(self.end, Point):
@@ -215,6 +221,7 @@ class Maze:
         entrance.set_left(False)
         self._draw_cell(0,0)
         exit.set_right(False)
+        exit.set_win(True)
         self._draw_cell(self.num_rows,self.num_cols)
 
     def _animate(self):
@@ -272,25 +279,58 @@ class Maze:
                     self.cells[i][j].set_visited(False)
     
     def solve(self):
-        return self._solve_r(0,0)
+        return self._solve_r(0,0,self.cells[0][0])
     
-    def _solve_r(self):
+    def _solve_r(self,i,j,current=None):
         self._animate()
+        if current.get_win:
+            return True
+        current.set_visited(True)
+        poss_dir = self.get_adjacent_not_visited(i, j)
+        for k,cell in poss_dir:
+            if cell is not None:
+                if k == "up" and not cell.get_down():
+                    current.draw_move(cell)
+                    if self._solve_r(i-1,j,cell):
+                        return True
+                    current.draw_move(cell,True)
+
+                elif k == "down" and not cell.get_up():
+                    current.draw_move(cell)
+                    if self._solve_r(i+1,j,cell):
+                        return True
+                    current.draw_move(cell,True)
+                    
+                elif k == "right" and not cell.get_up:
+                    current.draw_move(cell)
+                    if self._solve_r(i,j-1,cell):
+                        return True
+                    current.draw_move(cell,True)
+
+                elif k == "left":
+                    current.draw_move(cell)
+                    if self._solve_r(i,j+1,cell):
+                        return True
+                    current.draw_move(cell,True)
+        return False
+
+
+        
+        
+        
         
         
 
 
 def main():
-    window = Window(1000, 800)
-    start = Point(20, 20)
-    maze = Maze(start, 4, 4, 20, 20, window)
-    # for i in range(4):
-    #     for j in range(4):
-    #         maze._draw_cell(i, j)
-    
+    num_cols = 12
+    num_rows = 10
+    window = Window(1000, 800)  # Create a new Window object
+    maze = Maze(Point(20, 20), num_cols, num_rows, 20, 20, window=window)
+    maze._break_entrance_and_exit()
     maze.break_walls_r(0,0)
     maze._draw_maze()
-    maze._animate()
+    maze.solve()
     window.wait_for_close()
 
 main()
