@@ -13,9 +13,10 @@ class Window:
         self.running = True
         self.root.protocol("WM_DELETE_WINDOW", self.close)
 
+
     def redraw(self):
-        self.root.update_idletasks()
-        self.root.update()
+        self.canvas.update()  # Update the canvas content
+        self.root.update()  # Force the window to redraw
 
     def wait_for_close(self):
         while self.running == True:
@@ -283,35 +284,36 @@ class Maze:
     
     def _solve_r(self,i,j,current=None):
         self._animate()
-        if current.get_win:
+        if current.get_win() == True:
             return True
         current.set_visited(True)
         poss_dir = self.get_adjacent_not_visited(i, j)
-        for k,cell in poss_dir:
-            if cell is not None:
-                if k == "up" and not cell.get_down():
-                    current.draw_move(cell)
-                    if self._solve_r(i-1,j,cell):
-                        return True
-                    current.draw_move(cell,True)
+        unvisited_dirs = {key: value for key, value in poss_dir.items() if value is not None}
+        for k,cell in unvisited_dirs.items():
+            
+            if k == "up" and not cell.get_down() and not current.get_up() and i > 0:
+                current.draw_move(cell)
+                if self._solve_r(i-1,j,cell):
+                    return True
+                current.draw_move(cell,True)
 
-                elif k == "down" and not cell.get_up():
-                    current.draw_move(cell)
-                    if self._solve_r(i+1,j,cell):
-                        return True
-                    current.draw_move(cell,True)
-                    
-                elif k == "right" and not cell.get_up:
-                    current.draw_move(cell)
-                    if self._solve_r(i,j-1,cell):
-                        return True
-                    current.draw_move(cell,True)
+            elif k == "down" and not cell.get_up() and not current.get_down() and i < self.num_rows:
+                current.draw_move(cell)
+                if self._solve_r(i+1,j,cell):
+                    return True
+                current.draw_move(cell,True)
+                
+            elif k == "right" and not cell.get_left() and not current.get_right() and j < self.num_cols:
+                current.draw_move(cell)
+                if self._solve_r(i,j+1,cell):
+                    return True
+                current.draw_move(cell,True)
 
-                elif k == "left":
-                    current.draw_move(cell)
-                    if self._solve_r(i,j+1,cell):
-                        return True
-                    current.draw_move(cell,True)
+            elif k == "left" and not cell.get_right() and not current.get_left() and j > 0:
+                current.draw_move(cell)
+                if self._solve_r(i,j-1,cell):
+                    return True
+                current.draw_move(cell,True)
         return False
 
 
@@ -323,14 +325,16 @@ class Maze:
 
 
 def main():
-    num_cols = 12
+    num_cols = 10
     num_rows = 10
     window = Window(1000, 800)  # Create a new Window object
     maze = Maze(Point(20, 20), num_cols, num_rows, 20, 20, window=window)
     maze._break_entrance_and_exit()
     maze.break_walls_r(0,0)
+    maze.reset_cells_visited()
     maze._draw_maze()
-    maze.solve()
+    solved = maze.solve()
+    print(f"maze solved: {solved}")
     window.wait_for_close()
 
 main()
